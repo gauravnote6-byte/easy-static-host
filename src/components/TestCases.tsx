@@ -192,6 +192,7 @@ export const TestCases = ({ projectId }: TestCasesProps) => {
       'Description': tc.description,
       'Steps': tc.steps.join('\n'),
       'Expected Result': tc.expectedResult,
+      'Test Data': tc.testData || '',
       'Priority': tc.priority,
       'Status': tc.status,
       'User Story': tc.userStoryTitle,
@@ -226,6 +227,7 @@ export const TestCases = ({ projectId }: TestCasesProps) => {
       'Description': tc.description,
       'Steps': tc.steps.join('\n'),
       'Expected Result': tc.expectedResult,
+      'Test Data': tc.testData || '',
       'Priority': tc.priority,
       'Status': tc.status,
       'Estimated Time': tc.estimatedTime
