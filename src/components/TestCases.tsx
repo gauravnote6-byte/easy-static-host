@@ -450,6 +450,7 @@ export const TestCases = ({ projectId }: TestCasesProps) => {
           steps: (row.steps || row.Steps || row.STEPS || '').toString().split('\n').filter((s: string) => s.trim()),
           expectedResult: row.expected_result || row['Expected Result'] || row['EXPECTED RESULT'] || '',
           priority: (row.priority || row.Priority || row.PRIORITY || 'medium').toLowerCase(),
+          testData: row.test_data || row['Test Data'] || row['TEST DATA'] || row.testData || '',
           userStoryTitle: userStoryTitle,
           project_id: projectId
         };
@@ -506,6 +507,7 @@ export const TestCases = ({ projectId }: TestCasesProps) => {
             steps: testCase.steps.join('\n'),
             expected_result: testCase.expectedResult,
             priority: testCase.priority,
+            test_data: testCase.testData,
             status: 'not-run',
             project_id: projectId,
             user_story_id: matchingStory.id
@@ -601,6 +603,7 @@ export const TestCases = ({ projectId }: TestCasesProps) => {
         'description': 'Test user login functionality with valid credentials',
         'steps': 'Navigate to login page\nEnter valid username\nEnter valid password\nClick login button',
         'expected_result': 'User should be successfully logged in and redirected to dashboard',
+        'test_data': 'Username: testuser@example.com\nPassword: TestPass123',
         'priority': 'high',
         'user_story_title': 'User Authentication'
       },
@@ -610,6 +613,7 @@ export const TestCases = ({ projectId }: TestCasesProps) => {
         'description': 'Test password reset functionality',
         'steps': 'Click forgot password\nEnter email address\nClick reset button\nCheck email for reset link',
         'expected_result': 'Password reset email should be sent successfully',
+        'test_data': 'Email: testuser@example.com',
         'priority': 'medium',
         'user_story_title': 'User Authentication'
       }
@@ -625,6 +629,7 @@ export const TestCases = ({ projectId }: TestCasesProps) => {
       { Field: 'description', Description: 'Test case description (Optional)', Example: 'Test user login functionality' },
       { Field: 'steps', Description: 'Test steps separated by new lines (Optional)', Example: 'Step 1\\nStep 2\\nStep 3' },
       { Field: 'expected_result', Description: 'Expected test result (Optional)', Example: 'User should be logged in' },
+      { Field: 'test_data', Description: 'Test data required for the test case (Optional)', Example: 'Username: admin\\nPassword: pass123' },
       { Field: 'priority', Description: 'Priority: low, medium, or high (Optional, defaults to medium)', Example: 'high' },
       { Field: 'user_story_title', Description: 'User story title that exists in your project (Required)', Example: 'User Authentication' }
     ];
