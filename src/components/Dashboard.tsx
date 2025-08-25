@@ -129,10 +129,11 @@ export const Dashboard = ({ onViewChange }: DashboardProps) => {
       const testCasesCount = testCases?.length || 0;
       const testCasesPassed = testCases?.filter(tc => tc.status === 'passed').length || 0;
 
-      // Load AI usage data (project-wide, not user-specific)
+      // Load AI usage data (user-specific for their projects)
       const { data: aiUsage, error: aiError } = await supabase
         .from('ai_usage_logs')
         .select('*')
+        .eq('user_id', session.user.id)
         .in('project_id', projectIds);
 
       if (aiError) throw aiError;
