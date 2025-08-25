@@ -106,8 +106,8 @@ export const UserStories = ({ onViewChange, projectId }: UserStoriesProps) => {
   const [showCustomPromptDialog, setShowCustomPromptDialog] = useState(false);
   const [customPrompt, setCustomPrompt] = useState('');
   const [selectedStoryForRegenerate, setSelectedStoryForRegenerate] = useState<string | null>(null);
-  const [uploadedImage, setUploadedImage] = useState<File | null>(null);
-  const [imagePreview, setImagePreview] = useState<string | null>(null);
+  const [uploadedImages, setUploadedImages] = useState<File[]>([]);
+  const [imagePreviews, setImagePreviews] = useState<string[]>([]);
   
   // Custom prompt states for initial generation
   const [showInitialGenerationDialog, setShowInitialGenerationDialog] = useState(false);
@@ -540,7 +540,7 @@ export const UserStories = ({ onViewChange, projectId }: UserStoriesProps) => {
     }
   };
 
-  const generateTestCases = async (storyId: string, customPrompt?: string, imageFile?: File) => {
+  const generateTestCases = async (storyId: string, customPrompt?: string, imageFiles?: File[]) => {
     const story = stories.find(s => s.id === storyId);
     if (!story) return;
 
@@ -582,16 +582,23 @@ export const UserStories = ({ onViewChange, projectId }: UserStoriesProps) => {
         customPrompt
       };
 
-      // Convert image to base64 if provided
-      if (imageFile) {
-        const reader = new FileReader();
-        const imageData = await new Promise<string>((resolve, reject) => {
-          reader.onload = () => resolve(reader.result as string);
-          reader.onerror = reject;
-          reader.readAsDataURL(imageFile);
-        });
-        requestBody.imageData = imageData;
-        requestBody.imageType = imageFile.type;
+      // Convert images to base64 if provided
+      if (imageFiles && imageFiles.length > 0) {
+        const imageDataArray = [];
+        for (const image of imageFiles) {
+          const reader = new FileReader();
+          const imageData = await new Promise<string>((resolve, reject) => {
+            reader.onload = () => resolve(reader.result as string);
+            reader.onerror = reject;
+            reader.readAsDataURL(image);
+          });
+          imageDataArray.push({
+            data: imageData,
+            type: image.type,
+            name: image.name
+          });
+        }
+        requestBody.imageData = imageDataArray;
       }
 
       const response = await fetch(`https://lghzmijzfpvrcvogxpew.supabase.co/functions/v1/generate-test-cases`, {
@@ -714,11 +721,11 @@ export const UserStories = ({ onViewChange, projectId }: UserStoriesProps) => {
     if (!selectedStoryForRegenerate) return;
     
     setShowCustomPromptDialog(false);
-    await generateTestCases(selectedStoryForRegenerate, customPrompt || undefined, uploadedImage || undefined);
+    await generateTestCases(selectedStoryForRegenerate, customPrompt || undefined, uploadedImages.length > 0 ? uploadedImages : undefined);
     setSelectedStoryForRegenerate(null);
     setCustomPrompt('');
-    setUploadedImage(null);
-    setImagePreview(null);
+    setUploadedImages([]);
+    setImagePreviews([]);
   };
 
   const handleGenerateClick = (storyId: string) => {
@@ -731,28 +738,39 @@ export const UserStories = ({ onViewChange, projectId }: UserStoriesProps) => {
     if (!selectedStoryForGeneration) return;
     
     setShowInitialGenerationDialog(false);
-    await generateTestCases(selectedStoryForGeneration, customPrompt || undefined, uploadedImage || undefined);
+    await generateTestCases(selectedStoryForGeneration, customPrompt || undefined, uploadedImages.length > 0 ? uploadedImages : undefined);
     setSelectedStoryForGeneration(null);
     setCustomPrompt('');
-    setUploadedImage(null);
-    setImagePreview(null);
+    setUploadedImages([]);
+    setImagePreviews([]);
   };
 
   const handleImageUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
-    const file = event.target.files?.[0];
-    if (file) {
-      setUploadedImage(file);
-      const reader = new FileReader();
-      reader.onload = () => {
-        setImagePreview(reader.result as string);
-      };
-      reader.readAsDataURL(file);
+    const files = event.target.files;
+    if (files) {
+      Array.from(files).forEach(file => {
+        if (uploadedImages.length < 5) { // Limit to 5 images
+          setUploadedImages(prev => [...prev, file]);
+          const reader = new FileReader();
+          reader.onload = () => {
+            setImagePreviews(prev => [...prev, reader.result as string]);
+          };
+          reader.readAsDataURL(file);
+        }
+      });
     }
+    // Reset the input
+    event.target.value = '';
   };
 
-  const removeImage = () => {
-    setUploadedImage(null);
-    setImagePreview(null);
+  const removeImage = (index: number) => {
+    setUploadedImages(prev => prev.filter((_, i) => i !== index));
+    setImagePreviews(prev => prev.filter((_, i) => i !== index));
+  };
+
+  const removeAllImages = () => {
+    setUploadedImages([]);
+    setImagePreviews([]);
   };
 
   const getPriorityColor = (priority: string) => {
@@ -1116,15 +1134,16 @@ export const UserStories = ({ onViewChange, projectId }: UserStoriesProps) => {
             </div>
             
             <div className="space-y-2">
-              <Label htmlFor="image-upload-initial">Upload Image (Optional)</Label>
+              <Label htmlFor="image-upload-initial">Upload Images (Optional)</Label>
               <p className="text-sm text-muted-foreground">
-                Upload a screenshot, mockup, or diagram to help generate more specific test cases
+                Upload screenshots, mockups, or diagrams to help generate more specific test cases (max 5 images)
               </p>
               <div className="flex items-center gap-4">
                 <input
                   id="image-upload-initial"
                   type="file"
                   accept="image/*"
+                  multiple
                   onChange={handleImageUpload}
                   className="hidden"
                 />
@@ -1133,35 +1152,51 @@ export const UserStories = ({ onViewChange, projectId }: UserStoriesProps) => {
                   variant="outline"
                   onClick={() => document.getElementById('image-upload-initial')?.click()}
                   className="flex items-center gap-2"
+                  disabled={uploadedImages.length >= 5}
                 >
                   <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
                   </svg>
-                  Upload Image
+                  Upload Images ({uploadedImages.length}/5)
                 </Button>
-                {uploadedImage && (
+                {uploadedImages.length > 0 && (
                   <Button
                     type="button"
                     variant="outline"
                     size="sm"
-                    onClick={removeImage}
+                    onClick={removeAllImages}
                     className="text-destructive hover:text-destructive"
                   >
-                    Remove
+                    Remove All
                   </Button>
                 )}
               </div>
               
-              {imagePreview && (
+              {imagePreviews.length > 0 && (
                 <div className="mt-2">
-                  <img
-                    src={imagePreview}
-                    alt="Preview"
-                    className="max-w-full h-auto max-h-48 rounded-md border"
-                  />
-                  <p className="text-sm text-muted-foreground mt-1">
-                    {uploadedImage?.name} ({Math.round((uploadedImage?.size || 0) / 1024)}KB)
-                  </p>
+                  <div className="grid grid-cols-2 gap-2">
+                    {imagePreviews.map((preview, index) => (
+                      <div key={index} className="relative">
+                        <img
+                          src={preview}
+                          alt={`Preview ${index + 1}`}
+                          className="w-full h-24 object-cover rounded-md border"
+                        />
+                        <Button
+                          type="button"
+                          variant="outline"
+                          size="sm"
+                          onClick={() => removeImage(index)}
+                          className="absolute top-1 right-1 h-6 w-6 p-0 text-destructive hover:text-destructive"
+                        >
+                          ×
+                        </Button>
+                        <p className="text-xs text-muted-foreground mt-1 truncate">
+                          {uploadedImages[index]?.name} ({Math.round((uploadedImages[index]?.size || 0) / 1024)}KB)
+                        </p>
+                      </div>
+                    ))}
+                  </div>
                 </div>
               )}
             </div>
@@ -1207,15 +1242,16 @@ export const UserStories = ({ onViewChange, projectId }: UserStoriesProps) => {
             </div>
             
             <div className="space-y-2">
-              <Label htmlFor="image-upload">Upload Image (Optional)</Label>
+              <Label htmlFor="image-upload">Upload Images (Optional)</Label>
               <p className="text-sm text-muted-foreground">
-                Upload a screenshot, mockup, or diagram to help generate more specific test cases
+                Upload screenshots, mockups, or diagrams to help generate more specific test cases (max 5 images)
               </p>
               <div className="flex items-center gap-4">
                 <input
                   id="image-upload"
                   type="file"
                   accept="image/*"
+                  multiple
                   onChange={handleImageUpload}
                   className="hidden"
                 />
@@ -1224,35 +1260,51 @@ export const UserStories = ({ onViewChange, projectId }: UserStoriesProps) => {
                   variant="outline"
                   onClick={() => document.getElementById('image-upload')?.click()}
                   className="flex items-center gap-2"
+                  disabled={uploadedImages.length >= 5}
                 >
                   <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
                   </svg>
-                  Upload Image
+                  Upload Images ({uploadedImages.length}/5)
                 </Button>
-                {uploadedImage && (
+                {uploadedImages.length > 0 && (
                   <Button
                     type="button"
                     variant="outline"
                     size="sm"
-                    onClick={removeImage}
+                    onClick={removeAllImages}
                     className="text-destructive hover:text-destructive"
                   >
-                    Remove
+                    Remove All
                   </Button>
                 )}
               </div>
               
-              {imagePreview && (
+              {imagePreviews.length > 0 && (
                 <div className="mt-2">
-                  <img
-                    src={imagePreview}
-                    alt="Preview"
-                    className="max-w-full h-auto max-h-48 rounded-md border"
-                  />
-                  <p className="text-sm text-muted-foreground mt-1">
-                    {uploadedImage?.name} ({Math.round((uploadedImage?.size || 0) / 1024)}KB)
-                  </p>
+                  <div className="grid grid-cols-2 gap-2">
+                    {imagePreviews.map((preview, index) => (
+                      <div key={index} className="relative">
+                        <img
+                          src={preview}
+                          alt={`Preview ${index + 1}`}
+                          className="w-full h-24 object-cover rounded-md border"
+                        />
+                        <Button
+                          type="button"
+                          variant="outline"
+                          size="sm"
+                          onClick={() => removeImage(index)}
+                          className="absolute top-1 right-1 h-6 w-6 p-0 text-destructive hover:text-destructive"
+                        >
+                          ×
+                        </Button>
+                        <p className="text-xs text-muted-foreground mt-1 truncate">
+                          {uploadedImages[index]?.name} ({Math.round((uploadedImages[index]?.size || 0) / 1024)}KB)
+                        </p>
+                      </div>
+                    ))}
+                  </div>
                 </div>
               )}
             </div>

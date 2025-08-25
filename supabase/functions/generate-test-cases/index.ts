@@ -39,7 +39,7 @@ serve(async (req) => {
     }
 
     const body = await req.json();
-    const { story, azureConfig, customPrompt, imageData, imageType } = body;
+    const { story, azureConfig, customPrompt, imageData } = body;
 
     // Input validation
     if (!story || !story.title) {
@@ -81,11 +81,11 @@ Priority: ${story.priority || 'Medium'}
 Issue Type: ${story.issueType || 'Story'}`;
 
     // Add image analysis if provided
-    if (imageData) {
+    if (imageData && Array.isArray(imageData) && imageData.length > 0) {
       prompt += `
 
-UPLOADED IMAGE CONTEXT:
-An image has been provided that shows UI elements, mockups, wireframes, or other visual context related to this user story. Please analyze the image and incorporate any visual elements, user interface components, workflows, or specific scenarios shown in the image when generating test cases.`;
+UPLOADED IMAGES CONTEXT:
+${imageData.length} image(s) have been provided that show UI elements, mockups, wireframes, or other visual context related to this user story. Please analyze all the images and incorporate any visual elements, user interface components, workflows, or specific scenarios shown in the images when generating test cases.`;
     }
 
     prompt += `
@@ -98,11 +98,11 @@ Please generate test cases that include:
 5. User acceptance criteria validation`;
 
     // Add image-specific test requirements
-    if (imageData) {
+    if (imageData && Array.isArray(imageData) && imageData.length > 0) {
       prompt += `
-6. UI-specific test cases based on the uploaded image
-7. Visual validation tests for elements shown in the image
-8. User interaction tests for components visible in the image`;
+6. UI-specific test cases based on the uploaded images
+7. Visual validation tests for elements shown in the images
+8. User interaction tests for components visible in the images`;
     }
 
     // Add custom prompt instructions if provided
@@ -148,17 +148,17 @@ Generate 8-12 test cases covering all important scenarios.`;
           },
           {
             role: 'user',
-            content: imageData ? [
+            content: imageData && Array.isArray(imageData) && imageData.length > 0 ? [
               {
                 type: 'text',
                 text: prompt
               },
-              {
+              ...imageData.map(img => ({
                 type: 'image_url',
                 image_url: {
-                  url: imageData
+                  url: img.data
                 }
-              }
+              }))
             ] : prompt
           }
         ],
