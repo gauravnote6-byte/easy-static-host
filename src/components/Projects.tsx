@@ -20,6 +20,7 @@ interface Project {
   created_at: string;
   updated_at: string;
   markdown_settings?: string;
+  member_count?: number;
 }
 
 interface ProjectsProps {
@@ -41,13 +42,34 @@ export const Projects = ({ onProjectSelect }: ProjectsProps) => {
 
   const fetchProjects = async () => {
     try {
-      const { data, error } = await supabase
+      // First get all projects
+      const { data: projectsData, error: projectsError } = await supabase
         .from('projects')
         .select('*')
         .order('updated_at', { ascending: false });
 
-      if (error) throw error;
-      setProjects(data || []);
+      if (projectsError) throw projectsError;
+
+      // Then get member counts for each project
+      const projectsWithMemberCount = await Promise.all(
+        (projectsData || []).map(async (project) => {
+          const { count, error: countError } = await supabase
+            .from('project_members')
+            .select('*', { count: 'exact', head: true })
+            .eq('project_id', project.id);
+
+          if (countError) {
+            console.error('Error counting members for project:', project.id, countError);
+          }
+
+          return {
+            ...project,
+            member_count: count || 0
+          };
+        })
+      );
+      
+      setProjects(projectsWithMemberCount);
     } catch (error) {
       console.error('Error fetching projects:', error);
       toast({
@@ -254,7 +276,7 @@ export const Projects = ({ onProjectSelect }: ProjectsProps) => {
                   </div>
                   <div className="flex items-center gap-1">
                     <Users className="h-4 w-4" />
-                    1 member
+                    {project.member_count || 0} {(project.member_count || 0) === 1 ? 'member' : 'members'}
                   </div>
                 </div>
               </CardContent>
