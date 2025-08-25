@@ -444,6 +444,7 @@ export const TestCases = ({ projectId }: TestCasesProps) => {
         // In a real scenario, you might want to handle this more robustly
         
         const testCase = {
+          testId: row.test_id || row['Test ID'] || row['TEST ID'] || row.TestID || row.testId,
           title: row.title || row.Title || row.TITLE,
           description: row.description || row.Description || row.DESCRIPTION || '',
           steps: (row.steps || row.Steps || row.STEPS || '').toString().split('\n').filter((s: string) => s.trim()),
@@ -487,9 +488,11 @@ export const TestCases = ({ projectId }: TestCasesProps) => {
 
       if (storiesError) throw storiesError;
 
-      // Process and insert test cases
+      // Process test cases - handle both inserts and updates
       const testCasesToInsert = [];
+      const testCasesToUpdate = [];
       const missingStories = new Set();
+      let updatedCount = 0;
 
       for (const testCase of validTestCases) {
         const matchingStory = userStories?.find(story => 
@@ -497,7 +500,7 @@ export const TestCases = ({ projectId }: TestCasesProps) => {
         );
 
         if (matchingStory) {
-          testCasesToInsert.push({
+          const testCaseData = {
             title: testCase.title,
             description: testCase.description,
             steps: testCase.steps.join('\n'),
@@ -506,7 +509,38 @@ export const TestCases = ({ projectId }: TestCasesProps) => {
             status: 'not-run',
             project_id: projectId,
             user_story_id: matchingStory.id
-          });
+          };
+
+          // Check if test case with this TestID already exists
+          if (testCase.testId) {
+            const { data: existingTestCase } = await supabase
+              .from('test_cases')
+              .select('id')
+              .eq('readable_id', testCase.testId)
+              .eq('project_id', projectId)
+              .single();
+
+            if (existingTestCase) {
+              // Update existing test case
+              const { error: updateError } = await supabase
+                .from('test_cases')
+                .update(testCaseData)
+                .eq('readable_id', testCase.testId)
+                .eq('project_id', projectId);
+
+              if (updateError) throw updateError;
+              updatedCount++;
+            } else {
+              // Insert new test case with specific TestID
+              testCasesToInsert.push({
+                ...testCaseData,
+                readable_id: testCase.testId
+              });
+            }
+          } else {
+            // Insert new test case without specific TestID (will be auto-generated)
+            testCasesToInsert.push(testCaseData);
+          }
         } else {
           missingStories.add(testCase.userStoryTitle);
         }
@@ -526,10 +560,13 @@ export const TestCases = ({ projectId }: TestCasesProps) => {
           .insert(testCasesToInsert);
 
         if (insertError) throw insertError;
+      }
 
+      const totalProcessed = testCasesToInsert.length + updatedCount;
+      if (totalProcessed > 0) {
         toast({
           title: "Import Successful",
-          description: `Successfully imported ${testCasesToInsert.length} test cases from Excel`,
+          description: `Successfully imported ${testCasesToInsert.length} new and updated ${updatedCount} existing test cases from Excel`,
         });
 
         // Refresh the test cases list
@@ -559,6 +596,7 @@ export const TestCases = ({ projectId }: TestCasesProps) => {
     // Template data with sample rows and instructions
     const templateData = [
       {
+        'test_id': 'TC-MY0001',
         'title': 'User Login Test',
         'description': 'Test user login functionality with valid credentials',
         'steps': 'Navigate to login page\nEnter valid username\nEnter valid password\nClick login button',
@@ -567,6 +605,7 @@ export const TestCases = ({ projectId }: TestCasesProps) => {
         'user_story_title': 'User Authentication'
       },
       {
+        'test_id': 'TC-MY0002',
         'title': 'Password Reset Test', 
         'description': 'Test password reset functionality',
         'steps': 'Click forgot password\nEnter email address\nClick reset button\nCheck email for reset link',
@@ -581,6 +620,7 @@ export const TestCases = ({ projectId }: TestCasesProps) => {
     
     // Add instructions sheet
     const instructionsData = [
+      { Field: 'test_id', Description: 'Test case ID (Optional). If provided and exists, will update existing test case', Example: 'TC-MY0001' },
       { Field: 'title', Description: 'Test case title (Required)', Example: 'User Login Test' },
       { Field: 'description', Description: 'Test case description (Optional)', Example: 'Test user login functionality' },
       { Field: 'steps', Description: 'Test steps separated by new lines (Optional)', Example: 'Step 1\\nStep 2\\nStep 3' },
