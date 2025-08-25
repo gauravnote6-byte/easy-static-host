@@ -317,12 +317,8 @@ export type Database = {
       }
     }
     Functions: {
-      generate_test_case_readable_id: {
-        Args: { p_project_id: string; p_user_story_id: string }
-        Returns: string
-      }
       generate_unique_test_case_id: {
-        Args: Record<PropertyKey, never>
+        Args: { p_project_id: string }
         Returns: string
       }
       get_user_role: {
