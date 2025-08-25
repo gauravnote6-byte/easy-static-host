@@ -6,11 +6,12 @@ import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Label } from "@/components/ui/label";
-import { Plus, FolderOpen, Calendar, Users, Settings } from "lucide-react";
+import { Plus, FolderOpen, Calendar, Users, Settings, Edit } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 import { validateText, sanitizeText } from "@/lib/security";
 import { ProjectSettings } from "./ProjectSettings";
+import { ProjectEditDialog } from "./ProjectEditDialog";
 import { useRoles } from "@/hooks/useRoles";
 
 interface Project {
@@ -19,6 +20,7 @@ interface Project {
   description: string;
   created_at: string;
   updated_at: string;
+  deleted_at?: string;
   markdown_settings?: string;
   member_count?: number;
 }
@@ -33,6 +35,7 @@ export const Projects = ({ onProjectSelect }: ProjectsProps) => {
   const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
   const [newProject, setNewProject] = useState({ name: "", description: "" });
   const [selectedProjectForSettings, setSelectedProjectForSettings] = useState<{ id: string; name: string } | null>(null);
+  const [selectedProjectForEdit, setSelectedProjectForEdit] = useState<{ id: string; name: string; description: string } | null>(null);
   const { toast } = useToast();
   const { isAdmin, loading: roleLoading } = useRoles();
 
@@ -42,10 +45,11 @@ export const Projects = ({ onProjectSelect }: ProjectsProps) => {
 
   const fetchProjects = async () => {
     try {
-      // First get all projects
+      // First get all non-deleted projects
       const { data: projectsData, error: projectsError } = await supabase
         .from('projects')
         .select('*')
+        .is('deleted_at', null)
         .order('updated_at', { ascending: false });
 
       if (projectsError) throw projectsError;
@@ -251,6 +255,23 @@ export const Projects = ({ onProjectSelect }: ProjectsProps) => {
                     </CardDescription>
                   </div>
                   <div className="flex items-center gap-2">
+                    {isAdmin && (
+                      <Button
+                        size="sm"
+                        variant="ghost"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setSelectedProjectForEdit({ 
+                            id: project.id, 
+                            name: project.name, 
+                            description: project.description || "" 
+                          });
+                        }}
+                        className="h-8 w-8 p-0"
+                      >
+                        <Edit className="h-4 w-4" />
+                      </Button>
+                    )}
                     <Button
                       size="sm"
                       variant="ghost"
@@ -291,6 +312,24 @@ export const Projects = ({ onProjectSelect }: ProjectsProps) => {
           projectName={selectedProjectForSettings.name}
           isOpen={true}
           onClose={() => setSelectedProjectForSettings(null)}
+        />
+      )}
+
+      {selectedProjectForEdit && (
+        <ProjectEditDialog
+          projectId={selectedProjectForEdit.id}
+          projectName={selectedProjectForEdit.name}
+          projectDescription={selectedProjectForEdit.description}
+          isOpen={true}
+          onClose={() => setSelectedProjectForEdit(null)}
+          onProjectUpdated={() => {
+            fetchProjects();
+            setSelectedProjectForEdit(null);
+          }}
+          onProjectDeleted={() => {
+            fetchProjects();
+            setSelectedProjectForEdit(null);
+          }}
         />
       )}
     </div>
