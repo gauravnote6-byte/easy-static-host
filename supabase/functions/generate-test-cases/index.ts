@@ -126,6 +126,7 @@ Format the response as a JSON array of test case objects with the following stru
   "priority": "high|medium|low",
   "steps": ["Step 1", "Step 2", "Step 3"],
   "expectedResult": "Expected outcome",
+  "testData": "Sample test data, input values, or data sets needed for this test case",
   "category": "functional|ui|integration|performance"
 }
 
