@@ -1,1 +1,7 @@
 project_id = "lghzmijzfpvrcvogxpew"
+
+[functions.azure-devops-integration]
+verify_jwt = false
+
+[functions.azure-devops-defects]
+verify_jwt = false
